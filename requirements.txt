@@ -1,0 +1,35 @@
+# Core Airflow and Dependencies
+apache-airflow==2.10.5
+SQLAlchemy==1.4.47  # Downgraded for Airflow compatibility
+croniter==6.0.0  # Airflow requires <6.0
+
+# Async/HTTP Libraries
+aiohttp==3.11.12
+httpx==0.28.1
+urllib3==1.26.18  # Compatible with botocore<1.27
+
+# Google Cloud
+google-api-core==2.24.2
+protobuf==4.25.3  # Downgraded for google-api-core compatibility
+google-cloud-bigquery==3.31.0
+
+# AWS
+s3fs==2024.3.1  # Latest stable version (adjust as needed)
+botocore>=1.33.0 
+
+# Database/ORM
+aiosqlite==0.21.0
+Flask-SQLAlchemy==2.5.1
+
+# OpenLineage (verify compatibility)
+apache-airflow-providers-openlineage==2.1.1
+openlineage-python==1.30.1  # Confirm with provider docs
+
+# Utilities
+python-dateutil==2.9.0
+pandas==2.2.3
+numpy==1.26.4
+PyYAML==6.0.2
+
+# Reddit API
+praw==7.8.1

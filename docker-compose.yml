@@ -1,0 +1,102 @@
+version: '3'
+
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: custom-airflow:2.7.1-python3.8
+  env_file:
+    - airflow.env
+  volumes:
+    - ./config:/opt/airflow/config
+    - ./dags:/opt/airflow/dags
+    - ./data:/opt/airflow/data
+    - ./etls:/opt/airflow/etls
+    - ./logs:/opt/airflow/logs
+    - ./pipelines:/opt/airflow/pipelines
+    - ./plugins:/opt/airflow/plugins
+    - ./tests:/opt/airflow/tests
+    - ./utils:/opt/airflow/utils
+    # - ./airflow.cfg:/opt/airflow/airflow.cfg
+    - ./requirements.txt:/opt/airflow/requirements.txt
+  depends_on:
+    - postgres
+    - redis
+
+services:
+  postgres:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: airflow_reddit
+      POSTGRES_PORT: 5432
+
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U airflow']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+
+  redis:
+    image: redis:latest
+    ports:
+      - '6379:6379'
+
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c " python -m pip install --upgrade pip 
+      && pip install -r /opt/airflow/requirements.txt 
+      &&airflow config get-value database sql_alchemy_conn
+      && airflow db init && airflow db upgrade 
+      && airflow users create --username admin --firstname admin --lastname admin --role Admin --email airflow@airflow.com --password admin"
+
+    restart: 'no'
+
+  airflow-webserver:
+    <<: *airflow-common
+    ports:
+      - '8080:8080'
+    environment:
+      # - AIRFLOW__WEBSERVER__WORKER_CLASS=gevent
+      # - AIRFLOW__WEBSERVER__WORKERS=2
+      # - AIRFLOW__WEBSERVER__WORKER_TIMEOUT=120
+      # - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_RECYCLE=1800
+      # - AIRFLOW__DATABASE__SQL_ALCHEMY_POOL_PRE_PING=True
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgres@postgres:5432/airflow_reddit
+    # In your docker-compose.yml under webserver service:
+    command: >
+      bash -c "gunicorn --bind :8080 
+      --workers 4 
+      --timeout 120 
+      --worker-class gthread 
+      --threads 20 
+      --access-logfile - 
+      --error-logfile - 
+      --preload 
+      'airflow.www.app:create_app()'"
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8080/health']
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    restart: always
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+volumes:
+  postgres-db-volume:

@@ -1,0 +1,11 @@
+#venv file
+.venv
+
+.env
+
+logs/*
+
+data/*
+
+config/config.conf
+
